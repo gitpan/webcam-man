@@ -1,0 +1,85 @@
+Send suggestions, flames, comments, whatever to
+  <saintly@innocent.com>
+
+CGI to manage a webcam and allow selective access to it; or a public
+list of other people who have come to visit the page...
+
+Keeps track of hits on the picture, not the pages (so doesn't work if
+images are off on the browser)
+
+call with http://.../webcam.cgi/index.html or no path and it displays 
+a configurable page showing the cam pic that refreshes (hopefully smart
+enough to fool some idiot browsers into refreshing the pic too) and a
+list of recent (possibly current) visitors to the pic
+
+call with http://.../webcam.cgi/visit.html or visitors.html and
+it just displays the list of who's looking at the picture
+
+call with http://.../webcam.cgi/login to log-in as a user
+(only for politeness; if the cam owner wants you to log in, you
+ get the login box automatically)
+
+call with http://.../webcam.cgi/config to enter config mode;
+ setup cam page layout, users, titles, preferences...
+
+Setting up the CGI:
+ Try putting it in it's own directory; it is also helpful to
+  have a folder "./data" under the directory the cgi is in to
+  store data files.  
+  EG. (assuming you want to call it "joecam" and apache runs as nobody)
+    mkdir /usr/local/share/apache/joecam/
+    mkdir /usr/local/share/apache/joecam/data
+    cp nph-webcam.cgi /usr/local/share/apache/joecam/
+    chown -R nobody /usr/local/share/apache/joecam/
+    chmod -R 0700 /usr/local/share/apache/joecam/data
+
+NOTE! IF you want to rename the CGI, the "nph-" in front of the name tells
+apache not to do header parsing; important since the CGI pretends to be
+a filesystem!
+
+ Make directory accessible in Apache; possibly with an entry in
+  httpd.conf like:
+    <Directory /usr/local/share/apache/joecam/>
+    SetHandler cgi-script
+    AllowOverride None
+    Options ExecCGI  
+    </Directory>
+
+ If you want to have it accessible from apache without it looking like a
+ cgi; eg:     http://www.foo.bar.com/webcam/
+ instead of   http://www.foo.bar.com/joecam/nph-webcam.cgi/
+ An apache directive in httpd.conf like
+   Alias  /joecam "/usr/local/share/apache/joecam"
+ Should work
+   
+Once it is set up, edit the lines below pertaining to paths:
+ If you followed the examples above, you would change 'PATH' to
+   'PATH'  => "/usr/local/share/apache/joecam",
+ and assuming your webcam program uploads to 
+   /usr/home/joecam/webcam32.jpg
+ You would set 'CAM' to
+   'CAM'   => "/usr/home/joecam/webcam32.jpg"
+
+Change the line @PRIV = ... to be the name of the main user you intend
+to use to edit system config.  Eg, if you want to log in as a user called 
+Joe, you would change it to
+  @PRIV = ("Joe");
+
+It does not have to be a valid user on your system; the program maintains
+a small user database of it's own.  If for some reason you want to allow
+several usernames to edit the configuration, you can put them all in the
+array --
+  @PRIV = ("Joe","Billy-bob","Mary-sue"); 
+
+Only the first user listed will be created when the program is run the
+first time.
+
+When the script runs the first time, it sets up a default configuration
+and a privileged (ie. able to edit the config) user called whatever you
+have listed as the first user in @PRIV.  By default, this is "joeuser".
+The password is the same as the username.  Use this to go to config mode,
+have a look at the system settings and change the password on your account;
+click the link on the username, type something (plaintext) in the password
+box, then update the user.
+
+That should be all there is to setting up the program!  

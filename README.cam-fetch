@@ -1,0 +1,33 @@
+Send suggestions, flames, comments, whatever to 
+  <saintly@innocent.com>
+
+ 
+Cam-fetch, is a daemon to grab and mirror a file on a remote system.  
+It normally fetches from an HTTP server, but you could modify it fetch from 
+FTP or via some other method as well
+
+To use it, modify the first lines
+  $REMOTE_FILE  - the name of the file on a remote HTTP server, eg;
+                  /~joe/uploads/webcam32.jpg
+  $REMOTE_HOST  - the name of the remote server, eg:
+                  www.somewebcam.com
+
+(These two settings would be a URL of
+   http://www.somewebcam.com/~joe/uploads/webcam32.jpg
+)
+
+  $LOCAL_FILE  - Full path of the local file to write to
+
+Then run it from the command line; it takes no arguments since all the
+settings are hard-coded.  It will try to make a HEAD request to a web 
+server to see if the file there is newer than the existing one, then will
+only update the local file if it changes on the server.
+
+The number after "fetch" (30) indicates how long the daemon should wait
+before asking the server for the picture again if the picture changed since
+the last time we looked (presumably, this means the picture is "live").
+
+The number after "sleep" (900) indicates how long the daemon should wait
+before asking the server for the picture again if the picture has NOT
+changed since the last time we asked...  This amounts to 15 minutes which
+assumes that the picture is not being updated frequently at the moment.

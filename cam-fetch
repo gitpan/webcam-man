@@ -1,0 +1,91 @@
+#!/usr/bin/perl5
+# Fetch pic from remote server, unless local pic is newer
+
+use strict;
+use vars qw($REMOTE_FILE $REMOTE_HOST $REMOTE_PORT $LOCAL_FILE);
+use vars qw($months @to $mode $modes);
+
+if($ENV{'REQUEST_METHOD'}) { exit 1; } # Not a cgi, run directly
+
+$REMOTE_FILE = "/~joe/webcam32.jpg";
+($REMOTE_HOST,$REMOTE_PORT) = ("www.somewebcam.com",80);
+$LOCAL_FILE  = "/usr/home/joe/webcam32.jpg";
+
+$months = {
+  'Jan' => 0, 'Feb' => 1, 'Mar' => 2, 'Apr' => 3,
+  'May' => 4, 'Jun' => 5, 'Jul' => 6, 'Aug' => 7,
+  'Sep' => 8, 'Oct' => 9, 'Nov' => 10,'Dec' => 11,
+};  # Months hash for resolving time string
+
+# Stat file to see if it is newer...
+(@to) = reverse gmtime(+(stat($LOCAL_FILE))[9]); splice(@to,0,3); 
+$modes = {
+  'sleep' => 900,   # Time to sleep when pic is not updating
+  'fetch' =>  30,   # Time to sleep when pic is being updated
+};
+my($pm) = $0; $pm =~ s/.*\///;
+
+while(1) { 
+  if(&isnewer()) { $mode = "fetch";  &fetch_file; }
+  else { $mode = "sleep"; }
+  my($sleep) = time + $$modes{$mode}; 
+  while(time < $sleep) { 
+    $0 = "$pm ($mode mode) sleeping " . ($sleep-time); 
+    sleep ( (($sleep - time) < 5) ? 5 : (($sleep-time) /2) );
+  }
+}
+
+# Mirror the remote file
+sub fetch_file {
+  my(@lines,$line);
+  open(CAM,">$LOCAL_FILE") || die "$! at ";
+  my(@lines) = split(/\n/,&make_request("$REMOTE_HOST",$REMOTE_PORT,
+     "GET $REMOTE_FILE HTTP/1.0\n\n"));
+  while( ($line = shift(@lines)) !~ /^\s+$/ ) { next; }
+  print CAM join("\n",@lines); close(CAM); 
+}
+
+# Be polite, get head data on remote file rather than download it all the time
+sub isnewer {
+  my(@lines,$line,$lastmod);
+  my(@lines) = split(/\n/,&make_request("$REMOTE_HOST",$REMOTE_PORT,
+     "HEAD $REMOTE_FILE HTTP/1.0\n\n"));
+  while( ($line = shift(@lines)) !~ /^\s+$/ ) { 
+    if($line =~ /^Last-Modified: (.*)/) { $lastmod = $1; }
+  }
+  my($rv) = 0;
+  if( $lastmod =~ /([A-Za-z]+), (\d+) ([A-Za-z]+) (\d+) ([0-9\:]+)/ )  { 
+    my($mm,$dd,$yy,$tt) = ($3,$2,$4,$5); 
+    $yy -= 1900; $mm = $$months{$mm}; my($mh,$mn,$ms) = split(/:/,$tt);
+    my(@tm) = reverse ($ms,$mn,$mh,$dd,$mm,$yy);
+    # print "LOCAL: ",join(",",@to),"\nRemote: ",join(",",@tm),"\n";
+    for($tt=0;$tt<@tm;$tt++) { if( $to[$tt] < $tm[$tt] ) { $rv = 1; last; } }
+    @to = (@tm);
+  } else { return 1; } # We assume so if HEAD fails
+  return $rv;
+}
+
+sub make_request {
+  my($them,$port,$request,$this,$that,$child) = @_;
+  return 0 if (!$them || !$port);
+
+  my($AF_INET,$SOCK_STREAM,$sockaddr,$ret) = (2,1,'S n a4 x8',"");
+  my($proto,$hostname) = (+(getprotobyname('tcp'))[2],`hostname`);
+
+  chop($hostname);
+  $port = +(getservbyname($port,'tcp'))[2] unless $port =~ /^\d+$/;;
+  $this = pack($sockaddr, $AF_INET, 0, +(gethostbyname($hostname))[4]);
+  $that = pack($sockaddr, $AF_INET, $port, +(gethostbyname($them))[4]);
+
+  (socket(S, $AF_INET, $SOCK_STREAM, $proto) && bind(S,$this) && 
+    connect(S,$that)) || die "Some problem getting connected: $!";
+
+  select(S); $| = 1; select(STDOUT); $| = 0;
+
+  if($child = fork) {      
+    print S "$request"; exit;
+  } else {
+    $0 = "$pm (fetching file)\n"; while(<S>) { $ret .= $_; }
+  }
+  return $ret;
+}
